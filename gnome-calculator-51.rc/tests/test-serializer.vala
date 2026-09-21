@@ -1,0 +1,175 @@
+/*
+ * Copyright (C) 2012 Arth Patel
+ *
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 2 of the License, or (at your option) any later
+ * version. See http://www.gnu.org/copyleft/gpl.html the full text of the
+ * license.
+ */
+
+private int fail_count = 0;
+private int pass_count = 0;
+private const string thousand_separator = ",";
+private const string radix_string = ".";
+
+private void pass (string? text = null)
+{
+    //stdout.printf ("PASS: %s\n", text);
+    pass_count++;
+}
+
+private void fail (string text)
+{
+    stdout.printf ("*FAIL: %s\n", text);
+    fail_count++;
+}
+
+private void test_number (Serializer s, string number, int base_value, int representation_base, string? expected_string)
+{
+    var n = mp_set_from_string (number, base_value);
+    s.set_base (base_value);
+    s.set_representation_base (representation_base);
+    if (s.to_string (n) == expected_string)
+        pass ();
+    else
+        fail ("Serializer returned (%s) => expected value (%s)".printf (s.to_string (n), expected_string));
+}
+
+private void test_fixed (Serializer s)
+{
+    s.set_number_format (DisplayFormat.FIXED);
+
+    test_number (s, "123456789012345678901234", 10, 10, "123,456,789,012,345,678,901,234");
+    test_number (s, "0.1234567890123456789012", 10, 10, "0.123456789");
+    test_number (s, "101010101010101010101010", 2, 2, "1010 1010 1010 1010 1010 1010");
+    test_number (s, "0.1010101010101010101010", 2, 2, "0.101010101");
+    test_number (s, "123456701234567012345670", 8, 8, "1234 5670 1234 5670 1234 5670");
+    test_number (s, "0.1234567012345670123456", 8, 8, "0.123456701");
+    test_number (s, "123456789ABCDEF012345678", 16, 16, "1234 5678 9ABC DEF0 1234 5678");
+    test_number (s, "0.ABCDEF0123456789ABCDEF", 16, 16, "0.ABCDEF012");
+}
+
+private void test_automatic (Serializer s)
+{
+    s.set_number_format (DisplayFormat.AUTOMATIC);
+
+    test_number (s, "0.10", 10, 10, "0.1");
+    test_number (s, "0.12345678901234567890", 10, 10, "0.123456789");
+    test_number (s, "123456789012", 10, 10, "123,456,789,012");
+    test_number (s, "12345678901234567890", 10, 10, "1.23456789×10¹⁹");
+    test_number (s, "9999999999500", 10, 10, "1×10¹³");
+
+    test_number (s, ".10", 2, 2, "0.1");
+    test_number (s, "0.10101010101010101010", 2, 2, "0.101010101");
+    test_number (s, "1010101010101010101010101010101010101010101010101010101010101010", 2, 2, "1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010 1010");
+    test_number (s, "10101010101010101010101010101010101010101010101010101010101010101", 2, 2, "1.010101011×10¹⁰⁰⁰⁰⁰⁰");
+
+    test_number (s, "0.10", 8, 8, "0.1");
+    test_number (s, "0.12345670123456701234", 8, 8, "0.123456701");
+    test_number (s, "1234567012345670123456", 8, 8, "12 3456 7012 3456 7012 3456");
+    test_number (s, "12345670123456701234567", 8, 8, "1.234567012×10²⁶");
+
+    test_number (s, "0.10", 16, 16, "0.1");
+    test_number (s, "0.123456789ABCDEF01234", 16, 16, "0.12345678A");
+    test_number (s, "123456789ABCDEF0", 16, 16, "1234 5678 9ABC DEF0");
+    test_number (s, "123456789ABCEDF01", 16, 16, "1.23456789B×10¹⁰");
+}
+
+private void test_scientific (Serializer s)
+{
+    s.set_number_format (DisplayFormat.SCIENTIFIC);
+
+    test_number (s, "1", 10, 10, "1");
+    test_number (s, "10", 10, 10, "1×10¹");
+    test_number (s, "1234567890", 10, 10, "1.23456789×10⁹");
+    test_number (s, "0.1", 10, 10, "1×10⁻¹");
+    test_number (s, "0.1234567890", 10, 10, "1.23456789×10⁻¹");
+    test_number (s, "9999999999500", 10, 10, "1×10¹³");
+    //Make sure other bases are represented using FIXED method.
+    test_number (s, "101010", 2, 2, "10 1010");
+    test_number (s, "12345670", 8, 8, "1234 5670");
+    test_number (s, "123456789ABCDEF0", 16, 16, "1234 5678 9ABC DEF0");
+    test_number (s, "0.010101", 2, 2, "0.010101");
+    test_number (s, "0.1234567", 8, 8, "0.1234567");
+    test_number (s, "0.123ABCDEF", 16, 16, "0.123ABCDEF");
+}
+
+private void test_engineering (Serializer s)
+{
+    s.set_number_format (DisplayFormat.ENGINEERING);
+
+    test_number (s, "1", 10, 10, "1");
+    test_number (s, "10", 10, 10, "10");
+    test_number (s, "1234567890", 10, 10, "1.23456789×10⁹");
+    test_number (s, "0.1", 10, 10, "100×10⁻³");
+    test_number (s, "0.1234567890", 10, 10, "123.456789×10⁻³");
+    test_number (s, "999999999999500", 10, 10, "1×10¹⁵");
+    //Make sure other bases are represented using FIXED method.
+    test_number (s, "101010", 2, 2, "10 1010");
+    test_number (s, "12345670", 8, 8, "1234 5670");
+    test_number (s, "123456789ABCDEF0", 16, 16, "1234 5678 9ABC DEF0");
+    test_number (s, "0.10101", 2, 2, "0.10101");
+    test_number (s, "0.1234567", 8, 8, "0.1234567");
+    test_number (s, "0.123ABCDEF", 16, 16, "0.123ABCDEF");
+}
+
+private void test_base_conversion (Serializer s)
+{
+    test_number (s, "12₈", 10, 2, "1010₂");
+    test_number (s, "10", 10, 2, "1010₂");
+    test_number (s, "A₁₆", 10, 2, "1010₂");
+    test_number (s, "1234567890123456789012345678901234567890", 10, 2, "11 1010 0000 1100 1001 0010 0000 0111 0101 1100 0000 1101 1011 1111 0011 1011 1000 1010 1100 1011 1100 0101 1111 1001 0110 1100 1110 0011 1111 0000 1010 1101 0010₂");
+
+    test_number (s, "1010₂", 10, 8, "12₈");
+    test_number (s, "10", 10, 8, "12₈");
+    test_number (s, "A₁₆", 10, 8, "12₈");
+    test_number (s, "1234567890123456789012345678901234567890", 10, 8, "1640 6222 0165 6015 5763 5612 6274 2771 3316 1760 5322₈");
+
+    test_number (s, "1010₂", 10, 10, "10");
+    test_number (s, "12₈", 10, 10, "10");
+    test_number (s, "A₁₆", 10, 10, "10");
+
+    test_number (s, "1010₂", 10, 16, "A₁₆");
+    test_number (s, "12₈", 10, 16, "A₁₆");
+    test_number (s, "10", 10, 16, "A₁₆");
+    test_number (s, "1234567890123456789012345678901234567890", 10, 16, "3 A0C9 2075 C0DB F3B8 ACBC 5F96 CE3F 0AD2₁₆");
+
+    test_number (s, "0b1010", 10, 10, "10");
+    test_number (s, "0B1010", 10, 10, "10");
+    test_number (s, "0o012", 10, 10, "10");
+    test_number (s, "0O012", 10, 10, "10");
+    test_number (s, "0xA", 10, 10, "10");
+    test_number (s, "0XA", 10, 10, "10");
+
+    test_number (s, "0b10103", 10, 10, null);
+    test_number (s, "0B10103", 10, 10, null);
+    test_number (s, "0o0128", 10, 10, null);
+    test_number (s, "0O0128", 10, 10, null);
+    test_number (s, "0xAH", 10, 10, null);
+    test_number (s, "0XAH", 10, 10, null);
+}
+
+static int main (string[] args)
+{
+    Intl.setlocale (LocaleCategory.ALL, "C");
+    var serializer = new Serializer (DisplayFormat.AUTOMATIC, 10, 9);
+    serializer.set_thousands_separator (thousand_separator.get_char ());
+    serializer.set_radix (radix_string.get_char ());
+    serializer.set_show_thousands_separators (true);
+    serializer.set_thousands_separator_count (3);
+
+    test_fixed (serializer);
+    test_automatic (serializer);
+    test_scientific (serializer);
+    test_engineering (serializer);
+
+    test_base_conversion (serializer);
+
+    if (fail_count == 0)
+        stdout.printf ("Passed all %i tests\n", pass_count);
+    else
+        stdout.printf ("Failed %i/%d tests\n", fail_count, pass_count + fail_count);
+
+    return fail_count;
+}
